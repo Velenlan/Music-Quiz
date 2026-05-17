@@ -12,7 +12,6 @@ export function useSocket() {
 
   const connect = useCallback((roomIdRaw: string, playerName: string) => {
     const roomId = roomIdRaw.trim().toUpperCase();
-    setJoiningRoomId(roomId);
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
     const socket = new WebSocket(`${protocol}//${host}`);
@@ -30,6 +29,7 @@ export function useSocket() {
       switch (type) {
         case WSEvent.INITIAL_SYNC:
           setPlayerId(payload.playerId);
+          setJoiningRoomId(payload.roomId); // Use server-confirmed roomId
           break;
         case WSEvent.ERROR:
           setError(payload);
@@ -57,11 +57,13 @@ export function useSocket() {
     const roomRef = doc(db, 'rooms', roomId);
 
     const unsubscribeRoom = onSnapshot(roomRef, (snapshot) => {
+      console.log(`Firestore snapshot update for ${roomId}, exists: ${snapshot.exists()}`);
       if (snapshot.exists()) {
         const data = snapshot.data() as GameRoom;
+        console.log(`Players in Firestore for ${roomId}:`, data.players?.length);
         setRoom(data);
       } else {
-        // Handle non-existent room if necessary, but server should create it
+        console.log(`Room ${roomId} does not exist in Firestore yet.`);
       }
     });
 

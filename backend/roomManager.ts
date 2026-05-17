@@ -98,7 +98,9 @@ export class RoomManager {
     this.room.state = GameState.PLAYING;
     await this.syncToFirestore();
 
+    console.log(`Fetching tracks for room ${this.room.id}...`);
     this.room.tracks = await fetchMixedPlaylist(settings.filters, settings.rounds);
+    console.log(`Fetched ${this.room.tracks.length} tracks for room ${this.room.id}`);
     this.room.currentTrackIndex = -1;
 
     if (this.room.tracks.length === 0) {
@@ -108,7 +110,7 @@ export class RoomManager {
       return;
     }
 
-    this.startNextRound();
+    await this.startNextRound();
   }
 
   private async startNextRound() {
@@ -135,7 +137,7 @@ export class RoomManager {
     this.room.options = [currentTrack.title, ...shuffledOthers.slice(0, 3).map(t => t.title)]
       .sort(() => Math.random() - 0.5);
 
-    this.startPhase(1);
+    await this.startPhase(1);
   }
 
   private async startPhase(phase: number) {
@@ -154,7 +156,7 @@ export class RoomManager {
 
   private handlePhaseTimeout() {
     if (this.room.state !== GameState.PLAYING) return;
-    this.endRound();
+    this.endRound().catch(e => console.error('End round failed', e));
   }
 
   public async submitAnswer(playerId: string, answer: string) {
@@ -178,7 +180,7 @@ export class RoomManager {
       player.lastGuessCorrect = true;
       player.lastGuessPoints = points;
 
-      this.endRound();
+      await this.endRound();
     } else {
       player.score = Math.max(0, player.score - WRONG_ANSWER_PENALTY);
       await this.syncToFirestore();
@@ -192,7 +194,7 @@ export class RoomManager {
     await this.syncToFirestore();
 
     this.activeTimer = setTimeout(() => {
-      this.startNextRound();
+      this.startNextRound().catch(e => console.error('Start next round failed', e));
     }, INTERMISSION_TIME);
   }
 

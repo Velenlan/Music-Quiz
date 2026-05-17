@@ -15,9 +15,27 @@ const PORT = 3000;
 
 class GameServer {
   private rooms: Map<string, RoomManager> = new Map();
+  private roomPromises: Map<string, Promise<RoomManager>> = new Map();
 
   constructor() {
     this.setupWSS();
+  }
+
+  private async getRoom(roomId: string): Promise<RoomManager> {
+    if (this.rooms.has(roomId)) return this.rooms.get(roomId)!;
+    if (this.roomPromises.has(roomId)) return this.roomPromises.get(roomId)!;
+
+    const promise = (async () => {
+      console.log(`Creating new RoomManager for ${roomId}`);
+      const manager = new RoomManager(roomId);
+      await manager.init();
+      this.rooms.set(roomId, manager);
+      this.roomPromises.delete(roomId);
+      return manager;
+    })();
+
+    this.roomPromises.set(roomId, promise);
+    return promise;
   }
 
   private setupWSS() {
@@ -46,10 +64,16 @@ class GameServer {
         this.joinRoom(ws, payload.roomId.trim().toUpperCase(), payload.playerName);
         break;
       case WSEvent.START_GAME:
-        this.rooms.get(payload.roomId.trim().toUpperCase())?.startGame(payload.settings);
+        try {
+          const manager = await this.getRoom(payload.roomId.trim().toUpperCase());
+          await manager.startGame(payload.settings);
+        } catch (e) {
+          console.error('Start game failed', e);
+        }
         break;
       case WSEvent.SUBMIT_ANSWER:
-        this.rooms.get(roomId)?.submitAnswer(playerId, payload.answer);
+        const currentManager = roomId ? this.rooms.get(roomId) : null;
+        currentManager?.submitAnswer(playerId, payload.answer);
         break;
       case WSEvent.SEARCH:
         this.searchMusic(ws, payload.query, payload.type);
@@ -83,20 +107,20 @@ class GameServer {
   }
 
   private async joinRoom(ws: WebSocket, roomId: string, playerName: string) {
-    if (!this.rooms.has(roomId)) {
-      const manager = new RoomManager(roomId);
-      await manager.init();
-      this.rooms.set(roomId, manager);
+    try {
+      const manager = await this.getRoom(roomId);
+      const playerId = Math.random().toString(36).substring(7);
+      
+      (ws as any).playerId = playerId;
+      (ws as any).roomId = roomId;
+
+      console.log(`Player ${playerName} (${playerId}) joining room ${roomId}`);
+      ws.send(JSON.stringify({ type: WSEvent.INITIAL_SYNC, payload: { playerId, roomId } }));
+      await manager.addPlayer(ws, playerId, playerName);
+    } catch (e) {
+      console.error('Join failed', e);
+      ws.send(JSON.stringify({ type: WSEvent.ERROR, payload: 'Failed to join room' }));
     }
-
-    const manager = this.rooms.get(roomId)!;
-    const playerId = Math.random().toString(36).substring(7);
-    
-    (ws as any).playerId = playerId;
-    (ws as any).roomId = roomId;
-
-    ws.send(JSON.stringify({ type: WSEvent.INITIAL_SYNC, payload: { playerId } }));
-    await manager.addPlayer(ws, playerId, playerName);
   }
 
   private handleDisconnect(ws: WebSocket) {
