@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 3. Primitive Definition
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isAdmin() { return isSignedIn() && request.auth.token.email == 'acelovek826@gmail.com' && request.auth.token.email_verified == true; }
+
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Validation Helpers
+    function isValidRoom(data) {
+      return data.keys().hasAll(['id', 'state', 'currentTrackIndex']) &&
+             data.id is string && data.id.size() <= 64 &&
+             data.state in ['LOBBY', 'PLAYING', 'INTERMISSION', 'GAME_OVER'] &&
+             data.currentTrackIndex is number;
+    }
+
+    function isValidPlayer(data) {
+      return data.keys().hasAll(['id', 'name', 'score']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() <= 32 &&
+             data.score is number;
+    }
+
+    // Room Rules
+    match /rooms/{roomId} {
+      allow read: if true; // Public access to join by ID
+      allow create: if isSignedIn() && isValidRoom(incoming());
+      allow update: if (isSignedIn() && (
+        isAdmin() ||
+        // Only server or Host should really update room state. 
+        // For now, allow any signed-in user if they are the host (we'd need a field for that)
+        isValidRoom(incoming())
+      ));
+      
+      match /players/{playerId} {
+        allow read: if true;
+        allow create, update: if isSignedIn() && isValidPlayer(incoming()) && (
+          isOwner(playerId) || isAdmin()
+        );
+        allow delete: if isAdmin() || isOwner(playerId);
+      }
+    }
+  }
+}

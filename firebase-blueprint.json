@@ -1,0 +1,50 @@
+{
+  "entities": {
+    "Room": {
+      "title": "Game Room",
+      "description": "Represents a single game session",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "state": { "type": "string", "enum": ["LOBBY", "PLAYING", "INTERMISSION", "GAME_OVER"] },
+        "currentTrackIndex": { "type": "number" },
+        "phase": { "type": "number" },
+        "phaseStartTime": { "type": "number" },
+        "nextRoundTime": { "type": "number" },
+        "options": { "type": "array", "items": { "type": "string" } },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "filters": { "type": "array" },
+            "rounds": { "type": "number" }
+          }
+        }
+      },
+      "required": ["id", "state"]
+    },
+    "Player": {
+      "title": "Player",
+      "description": "A player within a game room",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "score": { "type": "number" },
+        "isHost": { "type": "boolean" },
+        "lastGuessCorrect": { "type": "boolean" },
+        "lastGuessPoints": { "type": "number" }
+      },
+      "required": ["id", "name", "score"]
+    }
+  },
+  "firestore": {
+    "rooms/{roomId}": {
+      "schema": "Room",
+      "description": "Collection of all active game rooms"
+    },
+    "rooms/{roomId}/players/{playerId}": {
+      "schema": "Player",
+      "description": "Players in a specific room"
+    }
+  }
+}

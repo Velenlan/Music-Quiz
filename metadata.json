@@ -1,0 +1,6 @@
+{
+  "name": "Melody Master: Real-Time Music Reveal",
+  "description": "A high-stakes, real-time multiplayer music quiz game where audio reveals in increments. Guess the melody to win!",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
