@@ -42,10 +42,10 @@ class GameServer {
 
     switch (type) {
       case WSEvent.JOIN_ROOM:
-        this.joinRoom(ws, payload.roomId, payload.playerName);
+        this.joinRoom(ws, payload.roomId.trim().toUpperCase(), payload.playerName);
         break;
       case WSEvent.START_GAME:
-        this.rooms.get(payload.roomId)?.startGame(payload.settings);
+        this.rooms.get(payload.roomId.trim().toUpperCase())?.startGame(payload.settings);
         break;
       case WSEvent.SUBMIT_ANSWER:
         this.rooms.get(roomId)?.submitAnswer(playerId, payload.answer);
@@ -81,9 +81,11 @@ class GameServer {
     }
   }
 
-  private joinRoom(ws: WebSocket, roomId: string, playerName: string) {
+  private async joinRoom(ws: WebSocket, roomId: string, playerName: string) {
     if (!this.rooms.has(roomId)) {
-      this.rooms.set(roomId, new RoomManager(roomId));
+      const manager = new RoomManager(roomId);
+      await manager.init();
+      this.rooms.set(roomId, manager);
     }
 
     const manager = this.rooms.get(roomId)!;
@@ -93,7 +95,7 @@ class GameServer {
     (ws as any).roomId = roomId;
 
     ws.send(JSON.stringify({ type: WSEvent.INITIAL_SYNC, payload: { playerId } }));
-    manager.addPlayer(ws, playerId, playerName);
+    await manager.addPlayer(ws, playerId, playerName);
   }
 
   private handleDisconnect(ws: WebSocket) {

@@ -26,7 +26,29 @@ export class RoomManager {
       phaseStartTime: 0,
       nextRoundTime: 0
     };
-    this.syncToFirestore();
+  }
+
+  public async init() {
+    try {
+      const doc = await adminDb.collection('rooms').doc(this.room.id).get();
+      if (doc.exists) {
+        const data = doc.data() as any;
+        this.room = {
+          ...this.room,
+          ...data,
+          players: this.room.players // Keep in-memory players until they are loaded/merged
+        };
+        
+        // Also load players from subcollection
+        const playersCol = await adminDb.collection('rooms').doc(this.room.id).collection('players').get();
+        this.room.players = playersCol.docs.map(d => d.data() as Player);
+      } else {
+        await this.syncToFirestore();
+      }
+    } catch (e) {
+      console.error('Failed to init room from firestore', e);
+      await this.syncToFirestore();
+    }
   }
 
   private async syncToFirestore() {
@@ -82,6 +104,8 @@ export class RoomManager {
     if (this.room.state !== GameState.LOBBY) return;
     
     this.room.state = GameState.PLAYING;
+    await this.syncToFirestore();
+
     this.room.tracks = await fetchMixedPlaylist(settings.filters, settings.rounds);
     this.room.currentTrackIndex = -1;
 

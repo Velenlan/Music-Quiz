@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { GameRoom, WSEvent, WSMessage, Player } from '../types/game';
+import { GameRoom, WSEvent, WSMessage, Player, GameState } from '../types/game';
 import { db } from '../lib/firebase';
 import { doc, onSnapshot, collection } from 'firebase/firestore';
 
 export function useSocket() {
   const [room, setRoom] = useState<GameRoom | null>(null);
+  const [joiningRoomId, setJoiningRoomId] = useState<string | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
 
-  const connect = useCallback((roomId: string, playerName: string) => {
+  const connect = useCallback((roomIdRaw: string, playerName: string) => {
+    const roomId = roomIdRaw.trim().toUpperCase();
+    setJoiningRoomId(roomId);
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
     const socket = new WebSocket(`${protocol}//${host}`);
@@ -37,9 +40,20 @@ export function useSocket() {
       }
     };
 
+    socket.onclose = () => {
+      setRoom(null);
+      setPlayerId(null);
+    };
+
     socketRef.current = socket;
 
-    // Listen to Firestore for room state
+    // Subscriptions will be managed by useEffect triggered by connect call or state
+  }, []);
+
+  useEffect(() => {
+    if (!joiningRoomId) return;
+
+    const roomId = joiningRoomId;
     const roomRef = doc(db, 'rooms', roomId);
     const playersRef = collection(db, 'rooms', roomId, 'players');
 
@@ -55,13 +69,28 @@ export function useSocket() {
 
     const unsubscribePlayers = onSnapshot(playersRef, (snapshot) => {
       const players = snapshot.docs.map(doc => doc.data() as Player);
-      setRoom(prev => prev ? { ...prev, players } : null);
+      setRoom(prev => prev ? { ...prev, players } : {
+        id: roomId,
+        state: GameState.LOBBY,
+        players,
+        currentTrackIndex: -1,
+        tracks: [],
+        options: [],
+        phase: 1,
+        phaseStartTime: 0,
+        nextRoundTime: 0
+      } as GameRoom);
     });
 
     return () => {
       unsubscribeRoom();
       unsubscribePlayers();
-      socket.close();
+    };
+  }, [joiningRoomId]);
+
+  useEffect(() => {
+    return () => {
+      socketRef.current?.close();
     };
   }, []);
 

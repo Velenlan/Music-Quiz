@@ -15,7 +15,7 @@ export function Game({ room, send }: GameProps) {
   const [timeLeft, setTimeLeft] = useState(0);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
 
-  const currentTrack = room.tracks[room.currentTrackIndex];
+  const currentTrack = room.tracks?.[room.currentTrackIndex];
   const isIntermission = room.state === GameState.INTERMISSION;
   const isGameOver = room.state === GameState.GAME_OVER;
 
@@ -25,6 +25,18 @@ export function Game({ room, send }: GameProps) {
 
   const GUESS_WINDOW = 3000;
   const PHASE_DURATION = 1000;
+
+  if (!currentTrack && !isGameOver && room.state !== GameState.LOBBY) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+          <Music className="w-16 h-16 text-neutral-800 mx-auto animate-pulse" />
+          <h2 className="text-xl font-black uppercase tracking-widest text-neutral-500">Завантаження сесії...</h2>
+          <p className="text-neutral-700 text-xs">Будь ласка, зачекайте, поки ми налаштуємо ваше підключення.</p>
+        </motion.div>
+      </div>
+    );
+  }
 
   useEffect(() => {
     if (room.state === GameState.PLAYING) {
