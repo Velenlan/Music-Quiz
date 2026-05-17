@@ -17,7 +17,8 @@ export default function App() {
     }
   };
 
-  const isHost = room?.players.find(p => p.id === playerId)?.isHost ?? true;
+  const player = room?.players.find(p => p.id === playerId);
+  const isHost = player ? player.isHost : false;
 
   return (
     <div className="min-h-screen bg-black text-white selection:bg-white selection:text-black">

@@ -32,7 +32,20 @@ export class RoomManager {
     try {
       const doc = await adminDb.collection('rooms').doc(this.room.id).get();
       if (doc.exists) {
-        this.room = doc.data() as GameRoom;
+        const data = doc.data() as GameRoom;
+        // If the room has no active sockets but was in PLAYING/INTERMISSION state,
+        // it's likely a zombie room from a previous crash.
+        // For simplicity, if we are initializing it now, we reset it to LOBBY 
+        // to avoid getting stuck in a broken playback state.
+        this.room = {
+          ...data,
+          state: GameState.LOBBY,
+          players: [], // Start with fresh players for the new server instance
+          currentTrackIndex: -1,
+          tracks: [],
+          options: []
+        };
+        await this.syncToFirestore();
       } else {
         await this.syncToFirestore();
       }
@@ -44,7 +57,9 @@ export class RoomManager {
 
   private async syncToFirestore() {
     try {
-      await adminDb.collection('rooms').doc(this.room.id).set(this.room);
+      // Create a clean copy without non-serializable fields
+      const dataToSync = JSON.parse(JSON.stringify(this.room));
+      await adminDb.collection('rooms').doc(this.room.id).set(dataToSync);
     } catch (e) {
       console.error('Failed to sync to firestore', e);
     }

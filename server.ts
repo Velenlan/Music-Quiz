@@ -6,6 +6,7 @@ import { createServer as createViteServer } from 'vite';
 import axios from 'axios';
 import { WSEvent, WSMessage } from './src/types/game.ts';
 import { RoomManager } from './backend/roomManager.ts';
+import { adminDb } from './backend/firebaseAdmin.ts';
 
 const app = express();
 const server = createServer(app);
@@ -105,10 +106,15 @@ class GameServer {
 
     const manager = this.rooms.get(roomId);
     if (manager) {
-      manager.removePlayer(playerId).then(remaining => {
+      manager.removePlayer(playerId).then(async (remaining) => {
         if (remaining === 0) {
           this.rooms.delete(roomId);
-          console.log(`Room ${roomId} destroyed`);
+          try {
+            await adminDb.collection("rooms").doc(roomId).delete();
+          } catch (e) {
+            console.error("Failed to delete room from firestore", e);
+          }
+          console.log(`Room ${roomId} destroyed and cleaned up from Firestore`);
         }
       });
     }

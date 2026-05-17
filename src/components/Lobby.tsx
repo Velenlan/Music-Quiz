@@ -17,7 +17,15 @@ interface LobbyProps {
 export function Lobby({ onJoin, onStart, send, isHost, roomId: initialRoomId, players = [] }: LobbyProps) {
   const [name, setName] = useState('');
   const [roomId, setRoomId] = useState(initialRoomId || '');
-  const [joined, setJoined] = useState(!!initialRoomId);
+  const [joined, setJoined] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+
+  useEffect(() => {
+    if (initialRoomId) {
+      setJoined(true);
+      setIsConnecting(false);
+    }
+  }, [initialRoomId]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [selectedFilters, setSelectedFilters] = useState<{ type: 'artist' | 'genre' | 'collection', value: string }[]>([]);
@@ -94,13 +102,25 @@ export function Lobby({ onJoin, onStart, send, isHost, roomId: initialRoomId, pl
             onClick={() => {
               if (name && roomId) {
                 onJoin(roomId, name);
-                setJoined(true);
+                setIsConnecting(true);
               }
             }}
-            disabled={!name || !roomId}
-            className="w-full bg-white text-black font-black py-5 rounded-2xl hover:bg-neutral-100 transition-all disabled:opacity-20 disabled:cursor-not-allowed text-xs uppercase tracking-[0.2em] shadow-xl active:scale-[0.98]"
+            disabled={!name || !roomId || isConnecting}
+            className="w-full bg-white text-black font-black py-5 rounded-2xl hover:bg-neutral-100 transition-all disabled:opacity-20 disabled:cursor-not-allowed text-xs uppercase tracking-[0.2em] shadow-xl active:scale-[0.98] flex items-center justify-center gap-3"
           >
-            Enter Game
+            {isConnecting ? (
+              <>
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                >
+                  <Music className="w-4 h-4" />
+                </motion.div>
+                Connecting...
+              </>
+            ) : (
+              'Enter Game'
+            )}
           </button>
         </motion.div>
       ) : (
