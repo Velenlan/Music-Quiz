@@ -32,16 +32,7 @@ export class RoomManager {
     try {
       const doc = await adminDb.collection('rooms').doc(this.room.id).get();
       if (doc.exists) {
-        const data = doc.data() as any;
-        this.room = {
-          ...this.room,
-          ...data,
-          players: this.room.players // Keep in-memory players until they are loaded/merged
-        };
-        
-        // Also load players from subcollection
-        const playersCol = await adminDb.collection('rooms').doc(this.room.id).collection('players').get();
-        this.room.players = playersCol.docs.map(d => d.data() as Player);
+        this.room = doc.data() as GameRoom;
       } else {
         await this.syncToFirestore();
       }
@@ -53,14 +44,7 @@ export class RoomManager {
 
   private async syncToFirestore() {
     try {
-      const { players, ...roomData } = this.room;
-      await adminDb.collection('rooms').doc(this.room.id).set(roomData);
-      
-      // Sync players to subcollection
-      const playersCol = adminDb.collection('rooms').doc(this.room.id).collection('players');
-      for (const player of players) {
-        await playersCol.doc(player.id).set(player);
-      }
+      await adminDb.collection('rooms').doc(this.room.id).set(this.room);
     } catch (e) {
       console.error('Failed to sync to firestore', e);
     }
@@ -84,13 +68,6 @@ export class RoomManager {
     this.room.players = this.room.players.filter(p => p.id !== playerId);
     this.sockets.delete(playerId);
     
-    // Remove from firestore subcollection
-    try {
-      await adminDb.collection('rooms').doc(this.room.id).collection('players').doc(playerId).delete();
-    } catch (e) {
-      console.error('Failed to delete player from firestore', e);
-    }
-
     // If host left, assign new host
     if (this.room.players.length > 0 && !this.room.players.some(p => p.isHost)) {
       this.room.players[0].isHost = true;
@@ -146,11 +123,11 @@ export class RoomManager {
     this.startPhase(1);
   }
 
-  private startPhase(phase: number) {
+  private async startPhase(phase: number) {
     this.clearTimer();
     this.room.phase = phase as Phase;
     this.room.phaseStartTime = Date.now();
-    this.syncToFirestore();
+    await this.syncToFirestore();
 
     // After Phase Duration + Guess Window
     const totalPhaseTime = PHASE_DURATIONS[this.room.phase] + GUESS_WINDOW;
@@ -193,11 +170,11 @@ export class RoomManager {
     }
   }
 
-  private endRound() {
+  private async endRound() {
     this.clearTimer();
     this.room.state = GameState.INTERMISSION;
     this.room.nextRoundTime = Date.now() + INTERMISSION_TIME;
-    this.syncToFirestore();
+    await this.syncToFirestore();
 
     this.activeTimer = setTimeout(() => {
       this.startNextRound();

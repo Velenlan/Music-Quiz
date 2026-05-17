@@ -55,36 +55,18 @@ export function useSocket() {
 
     const roomId = joiningRoomId;
     const roomRef = doc(db, 'rooms', roomId);
-    const playersRef = collection(db, 'rooms', roomId, 'players');
 
     const unsubscribeRoom = onSnapshot(roomRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data() as GameRoom;
-        setRoom(prev => ({
-          ...data,
-          players: prev?.players || []
-        }));
+        setRoom(data);
+      } else {
+        // Handle non-existent room if necessary, but server should create it
       }
-    });
-
-    const unsubscribePlayers = onSnapshot(playersRef, (snapshot) => {
-      const players = snapshot.docs.map(doc => doc.data() as Player);
-      setRoom(prev => prev ? { ...prev, players } : {
-        id: roomId,
-        state: GameState.LOBBY,
-        players,
-        currentTrackIndex: -1,
-        tracks: [],
-        options: [],
-        phase: 1,
-        phaseStartTime: 0,
-        nextRoundTime: 0
-      } as GameRoom);
     });
 
     return () => {
       unsubscribeRoom();
-      unsubscribePlayers();
     };
   }, [joiningRoomId]);
 

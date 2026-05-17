@@ -32,21 +32,7 @@ service cloud.firestore {
     // Room Rules
     match /rooms/{roomId} {
       allow read: if true; // Public access to join by ID
-      allow create: if isSignedIn() && isValidRoom(incoming());
-      allow update: if (isSignedIn() && (
-        isAdmin() ||
-        // Only server or Host should really update room state. 
-        // For now, allow any signed-in user if they are the host (we'd need a field for that)
-        isValidRoom(incoming())
-      ));
-      
-      match /players/{playerId} {
-        allow read: if true;
-        allow create, update: if isSignedIn() && isValidPlayer(incoming()) && (
-          isOwner(playerId) || isAdmin()
-        );
-        allow delete: if isAdmin() || isOwner(playerId);
-      }
+      allow write: if isAdmin(); // Server-side writes only (Admin SDK bypasses this anyway)
     }
   }
 }
